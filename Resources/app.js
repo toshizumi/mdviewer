@@ -150,9 +150,10 @@
     if (!img.alt) img.alt = '画像を読み込めません: ' + decodeURI(img.getAttribute('src') || '');
   }
 
-  function render(text) {
+  function render(text, keepScroll) {
     clearFind();
-    var scroll = window.scrollY;
+    endPrintMode();
+    var scroll = keepScroll ? window.scrollY : 0;
 
     var split = splitFrontMatter(text);
     var html = md.render(split.body);
@@ -173,7 +174,7 @@
     content.appendChild(tpl.content);
 
     watchImages();
-    // 再読み込み時にスクロール位置を保つ
+    // 同じファイルの再読み込みなら位置を保ち、別のファイルに切り替えたなら先頭から
     window.scrollTo(0, scroll);
   }
 

@@ -1,43 +1,11 @@
 import AppKit
 
-/// ウインドウにファイルをドロップして開けるようにするための入れ物。
-/// WKWebView 側は `unregisterDraggedTypes()` してあるので、ドロップはここに届く。
-final class DropContainerView: NSView {
-    var onDropFiles: (([URL]) -> Void)?
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        registerForDraggedTypes([.fileURL])
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
-
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedFiles(sender).isEmpty ? [] : .copy
-    }
-
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let files = droppedFiles(sender)
-        guard !files.isEmpty else { return false }
-        onDropFiles?(files)
-        return true
-    }
-
-    private func droppedFiles(_ sender: NSDraggingInfo) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
-                                                         options: options) as? [URL] ?? []
-        return urls.filter { !$0.hasDirectoryPath }
-    }
-}
-
 // MARK: -
 
 final class DocumentWindowController: NSWindowController {
     private(set) var fileURL: URL
 
     private let markdownView = MarkdownView(frame: .zero)
-    private let container = DropContainerView(frame: .zero)
     private var watcher: FileWatcher?
 
     // NSSearchToolbarItem は挿入時に検索フィールドを組み直して delegate を握ってしまうため、
@@ -74,21 +42,20 @@ final class DocumentWindowController: NSWindowController {
             object: searchField)
 
         markdownView.onOpenFile = { [weak self] url in self?.handleLinkedFile(url) }
-        container.onDropFiles = { urls in
-            urls.forEach { DocumentCoordinator.shared.open($0) }
+        // 落とされたファイルは、まずこのウインドウで開く（2 つ目以降は新しいウインドウ）
+        markdownView.onDropFiles = { [weak self] urls in
+            guard let self else { return }
+            DocumentCoordinator.shared.open(urls, startingIn: self)
         }
 
-        loadDocument()
+        loadDocument(preservingScroll: false)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
 
     private func setUpContent() {
-        container.autoresizingMask = [.width, .height]
-        markdownView.frame = container.bounds
         markdownView.autoresizingMask = [.width, .height]
-        container.addSubview(markdownView)
-        window?.contentView = container
+        window?.contentView = markdownView
     }
 
     /// 1 枚目は前回のサイズを復元し、2 枚目以降は少しずらして重ねる。
@@ -109,7 +76,7 @@ final class DocumentWindowController: NSWindowController {
 
     // MARK: - 読み込み
 
-    private func loadDocument() {
+    private func loadDocument(preservingScroll: Bool) {
         window?.title = fileURL.lastPathComponent
         window?.representedURL = fileURL
         window?.subtitle = (fileURL.deletingLastPathComponent().path as NSString)
@@ -117,7 +84,9 @@ final class DocumentWindowController: NSWindowController {
 
         do {
             let text = try TextFile.read(at: fileURL)
-            markdownView.render(text: text, directory: fileURL.deletingLastPathComponent())
+            markdownView.render(text: text,
+                                directory: fileURL.deletingLastPathComponent(),
+                                preservingScroll: preservingScroll)
         } catch {
             markdownView.showMessage(error.localizedDescription)
         }
@@ -128,17 +97,24 @@ final class DocumentWindowController: NSWindowController {
 
     private func reloadFromDisk() {
         guard let text = try? TextFile.read(at: fileURL) else { return }
-        markdownView.render(text: text, directory: fileURL.deletingLastPathComponent())
+        markdownView.render(text: text,
+                            directory: fileURL.deletingLastPathComponent(),
+                            preservingScroll: true)
     }
 
+    /// このウインドウの表示を別のファイルに差し替える（ドロップで使う）。
     func show(fileURL url: URL) {
+        guard url != fileURL else {
+            reloadFromDisk()
+            return
+        }
         watcher?.stop()
         watcher = nil
         fileURL = url
         lastQuery = ""
         searchField.stringValue = ""
         matchCountLabel.stringValue = ""
-        loadDocument()
+        loadDocument(preservingScroll: false)
     }
 
     func applyPreferences() {
