@@ -1,6 +1,72 @@
 import AppKit
 import WebKit
 
+/// ファイルのドロップを受ける WKWebView。
+///
+/// ドロップ先は「カーソル下のいちばん手前のビュー」から決まり、AppKit は
+/// そこで見つからなくても親ビューまで遡ってはくれない。WKWebView が全面を覆っている以上、
+/// 親に `registerForDraggedTypes` しても届かないので、このビュー自身で受ける必要がある。
+final class DropTargetWebView: WKWebView {
+    /// 受け付けられるファイルを返す。空なら拒否する。
+    var acceptableFiles: ((NSDraggingInfo) -> [URL])?
+    var onDragEnter: (() -> Void)?
+    var onDragLeave: (() -> Void)?
+    var onDrop: (([URL]) -> Void)?
+
+    func enableFileDrops() {
+        // WKWebView が自前で登録している型（画像や URL の受け入れ）は使わないので外す
+        unregisterDraggedTypes()
+        registerForDraggedTypes([.fileURL])
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        guard let files = acceptableFiles?(sender), !files.isEmpty else { return [] }
+        onDragEnter?()
+        return .copy
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        (acceptableFiles?(sender).isEmpty == false) ? .copy : []
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        onDragLeave?()
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        onDragLeave?()
+    }
+
+    override func wantsPeriodicDraggingUpdates() -> Bool { false }
+
+    override func prepareForDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        acceptableFiles?(sender).isEmpty == false
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        onDragLeave?()
+        guard let files = acceptableFiles?(sender), !files.isEmpty else { return false }
+        onDrop?(files)
+        return true
+    }
+}
+
+/// ドラッグ中に「ここに落とせる」ことを示す枠。
+/// ドロップすると表示中の文書が置き換わるので、受け付ける状態が見えたほうがいい。
+private final class DropHighlightView: NSView {
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }   // 操作は素通しする
+
+    override func draw(_ dirtyRect: NSRect) {
+        let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 6, dy: 6),
+                                xRadius: 10, yRadius: 10)
+        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
+        path.fill()
+        NSColor.controlAccentColor.withAlphaComponent(0.85).setStroke()
+        path.lineWidth = 3
+        path.stroke()
+    }
+}
+
 /// Markdown を表示する WKWebView のラッパ。
 ///
 /// シェル HTML は起動時に一度だけ読み込み、以降は本文だけ JavaScript で差し替える。
@@ -8,9 +74,12 @@ import WebKit
 final class MarkdownView: NSView {
     /// Markdown 内のリンクからローカルファイルを開こうとしたとき
     var onOpenFile: ((URL) -> Void)?
+    /// ウインドウにファイルがドロップされたとき
+    var onDropFiles: (([URL]) -> Void)?
 
-    let webView: WKWebView
+    let webView: DropTargetWebView
     private let schemeHandler: ResourceSchemeHandler
+    private let dropHighlight = DropHighlightView()
 
     private var isShellReady = false
     private var pendingWork: [() -> Void] = []
@@ -29,7 +98,7 @@ final class MarkdownView: NSView {
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
         configuration.suppressesIncrementalRendering = false
 
-        let webView = WKWebView(frame: frameRect, configuration: configuration)
+        let webView = DropTargetWebView(frame: frameRect, configuration: configuration)
 
         self.schemeHandler = handler
         self.webView = webView
@@ -45,14 +114,38 @@ final class MarkdownView: NSView {
         webView.allowsBackForwardNavigationGestures = false
         // 読み込み前や慣性スクロールのはみ出しで白が覗かないようにする
         webView.underPageBackgroundColor = .textBackgroundColor
-        // ドロップは親ビューで受けたいので、WebView 自身には渡さない
-        webView.unregisterDraggedTypes()
 
         webView.autoresizingMask = [.width, .height]
         webView.frame = bounds
         addSubview(webView)
+        setUpFileDrops()
 
         webView.load(URLRequest(url: MarkdownView.shellURL))
+    }
+
+    // MARK: - ドロップ
+
+    private func setUpFileDrops() {
+        dropHighlight.autoresizingMask = [.width, .height]
+        webView.enableFileDrops()
+
+        webView.acceptableFiles = { sender in
+            let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+            let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
+                                                             options: options) as? [URL] ?? []
+            // フォルダと、テキストとして開けないもの（画像など）は受け付けない
+            return urls.filter { !$0.hasDirectoryPath && DocumentCoordinator.canOpen($0) }
+        }
+        webView.onDragEnter = { [weak self] in self?.showDropHighlight() }
+        webView.onDragLeave = { [weak self] in self?.dropHighlight.removeFromSuperview() }
+        webView.onDrop = { [weak self] urls in self?.onDropFiles?(urls) }
+    }
+
+    /// ドラッグ中だけ枠を載せる。最後に addSubview するので WebView の上に来る。
+    private func showDropHighlight() {
+        guard dropHighlight.superview !== self else { return }
+        dropHighlight.frame = bounds
+        addSubview(dropHighlight)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }

@@ -1,84 +1,11 @@
 import AppKit
 
-/// ドラッグ中に「ここに落とせる」ことを示す枠。
-/// ドロップすると表示中の文書が置き換わるので、受け付ける状態が見えたほうがいい。
-private final class DropHighlightView: NSView {
-    override var isFlipped: Bool { true }
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }   // クリックは素通しする
-
-    override func draw(_ dirtyRect: NSRect) {
-        let inset: CGFloat = 6
-        let frame = bounds.insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(roundedRect: frame, xRadius: 10, yRadius: 10)
-
-        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
-        path.fill()
-        NSColor.controlAccentColor.withAlphaComponent(0.85).setStroke()
-        path.lineWidth = 3
-        path.stroke()
-    }
-}
-
-/// ウインドウにファイルをドロップして開けるようにするための入れ物。
-/// WKWebView 側は `unregisterDraggedTypes()` してあるので、ドロップはここに届く。
-final class DropContainerView: NSView {
-    var onDropFiles: (([URL]) -> Void)?
-
-    private let highlight = DropHighlightView()
-
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
-        registerForDraggedTypes([.fileURL])
-        highlight.autoresizingMask = [.width, .height]
-    }
-
-    required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
-
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard !droppedFiles(sender).isEmpty else { return [] }
-        showHighlight()
-        return .copy
-    }
-
-    override func draggingExited(_ sender: NSDraggingInfo?) {
-        highlight.removeFromSuperview()
-    }
-
-    override func draggingEnded(_ sender: NSDraggingInfo) {
-        highlight.removeFromSuperview()
-    }
-
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        highlight.removeFromSuperview()
-        let files = droppedFiles(sender)
-        guard !files.isEmpty else { return false }
-        onDropFiles?(files)
-        return true
-    }
-
-    /// ドラッグ中だけ枠を載せる。最後に addSubview するので WebView の上に来る。
-    private func showHighlight() {
-        guard highlight.superview !== self else { return }
-        highlight.frame = bounds
-        addSubview(highlight)
-    }
-
-    /// フォルダと、テキストとして開けないもの（画像など）は受け付けない。
-    private func droppedFiles(_ sender: NSDraggingInfo) -> [URL] {
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
-                                                         options: options) as? [URL] ?? []
-        return urls.filter { !$0.hasDirectoryPath && DocumentCoordinator.canOpen($0) }
-    }
-}
-
 // MARK: -
 
 final class DocumentWindowController: NSWindowController {
     private(set) var fileURL: URL
 
     private let markdownView = MarkdownView(frame: .zero)
-    private let container = DropContainerView(frame: .zero)
     private var watcher: FileWatcher?
 
     // NSSearchToolbarItem は挿入時に検索フィールドを組み直して delegate を握ってしまうため、
@@ -116,7 +43,7 @@ final class DocumentWindowController: NSWindowController {
 
         markdownView.onOpenFile = { [weak self] url in self?.handleLinkedFile(url) }
         // 落とされたファイルは、まずこのウインドウで開く（2 つ目以降は新しいウインドウ）
-        container.onDropFiles = { [weak self] urls in
+        markdownView.onDropFiles = { [weak self] urls in
             guard let self else { return }
             DocumentCoordinator.shared.open(urls, startingIn: self)
         }
@@ -127,11 +54,8 @@ final class DocumentWindowController: NSWindowController {
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
 
     private func setUpContent() {
-        container.autoresizingMask = [.width, .height]
-        markdownView.frame = container.bounds
         markdownView.autoresizingMask = [.width, .height]
-        container.addSubview(markdownView)
-        window?.contentView = container
+        window?.contentView = markdownView
     }
 
     /// 1 枚目は前回のサイズを復元し、2 枚目以降は少しずらして重ねる。
