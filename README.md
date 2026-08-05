@@ -138,7 +138,11 @@ MDVIEWER_DEBUG=1 ./build/MDViewer.app/Contents/MacOS/MDViewer note.md
 
 `sample/test.md` に GFM・日本語・コード・表・画像・脚注を一通り詰めた確認用ファイルがあります。
 
-## 同梱しているもの
+## ライセンス
+
+MIT License（[LICENSE](LICENSE)）。
+
+同梱しているサードパーティ製ライブラリ:
 
 - [markdown-it](https://github.com/markdown-it/markdown-it) 14.1.0 — MIT
 - [markdown-it-footnote](https://github.com/markdown-it/markdown-it-footnote) 4.0.0 — MIT
