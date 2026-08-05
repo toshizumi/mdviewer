@@ -1,33 +1,74 @@
 import AppKit
 
+/// ドラッグ中に「ここに落とせる」ことを示す枠。
+/// ドロップすると表示中の文書が置き換わるので、受け付ける状態が見えたほうがいい。
+private final class DropHighlightView: NSView {
+    override var isFlipped: Bool { true }
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }   // クリックは素通しする
+
+    override func draw(_ dirtyRect: NSRect) {
+        let inset: CGFloat = 6
+        let frame = bounds.insetBy(dx: inset, dy: inset)
+        let path = NSBezierPath(roundedRect: frame, xRadius: 10, yRadius: 10)
+
+        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
+        path.fill()
+        NSColor.controlAccentColor.withAlphaComponent(0.85).setStroke()
+        path.lineWidth = 3
+        path.stroke()
+    }
+}
+
 /// ウインドウにファイルをドロップして開けるようにするための入れ物。
 /// WKWebView 側は `unregisterDraggedTypes()` してあるので、ドロップはここに届く。
 final class DropContainerView: NSView {
     var onDropFiles: (([URL]) -> Void)?
 
+    private let highlight = DropHighlightView()
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         registerForDraggedTypes([.fileURL])
+        highlight.autoresizingMask = [.width, .height]
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        droppedFiles(sender).isEmpty ? [] : .copy
+        guard !droppedFiles(sender).isEmpty else { return [] }
+        showHighlight()
+        return .copy
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        highlight.removeFromSuperview()
+    }
+
+    override func draggingEnded(_ sender: NSDraggingInfo) {
+        highlight.removeFromSuperview()
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        highlight.removeFromSuperview()
         let files = droppedFiles(sender)
         guard !files.isEmpty else { return false }
         onDropFiles?(files)
         return true
     }
 
+    /// ドラッグ中だけ枠を載せる。最後に addSubview するので WebView の上に来る。
+    private func showHighlight() {
+        guard highlight.superview !== self else { return }
+        highlight.frame = bounds
+        addSubview(highlight)
+    }
+
+    /// フォルダと、テキストとして開けないもの（画像など）は受け付けない。
     private func droppedFiles(_ sender: NSDraggingInfo) -> [URL] {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self],
                                                          options: options) as? [URL] ?? []
-        return urls.filter { !$0.hasDirectoryPath }
+        return urls.filter { !$0.hasDirectoryPath && DocumentCoordinator.canOpen($0) }
     }
 }
 
@@ -74,11 +115,13 @@ final class DocumentWindowController: NSWindowController {
             object: searchField)
 
         markdownView.onOpenFile = { [weak self] url in self?.handleLinkedFile(url) }
-        container.onDropFiles = { urls in
-            urls.forEach { DocumentCoordinator.shared.open($0) }
+        // 落とされたファイルは、まずこのウインドウで開く（2 つ目以降は新しいウインドウ）
+        container.onDropFiles = { [weak self] urls in
+            guard let self else { return }
+            DocumentCoordinator.shared.open(urls, startingIn: self)
         }
 
-        loadDocument()
+        loadDocument(preservingScroll: false)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) は使わない") }
@@ -109,7 +152,7 @@ final class DocumentWindowController: NSWindowController {
 
     // MARK: - 読み込み
 
-    private func loadDocument() {
+    private func loadDocument(preservingScroll: Bool) {
         window?.title = fileURL.lastPathComponent
         window?.representedURL = fileURL
         window?.subtitle = (fileURL.deletingLastPathComponent().path as NSString)
@@ -117,7 +160,9 @@ final class DocumentWindowController: NSWindowController {
 
         do {
             let text = try TextFile.read(at: fileURL)
-            markdownView.render(text: text, directory: fileURL.deletingLastPathComponent())
+            markdownView.render(text: text,
+                                directory: fileURL.deletingLastPathComponent(),
+                                preservingScroll: preservingScroll)
         } catch {
             markdownView.showMessage(error.localizedDescription)
         }
@@ -128,17 +173,24 @@ final class DocumentWindowController: NSWindowController {
 
     private func reloadFromDisk() {
         guard let text = try? TextFile.read(at: fileURL) else { return }
-        markdownView.render(text: text, directory: fileURL.deletingLastPathComponent())
+        markdownView.render(text: text,
+                            directory: fileURL.deletingLastPathComponent(),
+                            preservingScroll: true)
     }
 
+    /// このウインドウの表示を別のファイルに差し替える（ドロップで使う）。
     func show(fileURL url: URL) {
+        guard url != fileURL else {
+            reloadFromDisk()
+            return
+        }
         watcher?.stop()
         watcher = nil
         fileURL = url
         lastQuery = ""
         searchField.stringValue = ""
         matchCountLabel.stringValue = ""
-        loadDocument()
+        loadDocument(preservingScroll: false)
     }
 
     func applyPreferences() {

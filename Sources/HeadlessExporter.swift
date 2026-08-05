@@ -64,7 +64,8 @@ final class HeadlessExporter {
             view.overrideAppearance(appearance)
             window.appearance = appearance.nsAppearance
         }
-        view.render(text: text, directory: input.deletingLastPathComponent())
+        view.render(text: text, directory: input.deletingLastPathComponent(),
+                    preservingScroll: false)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + Self.timeout) { [weak self] in
             self?.finish(message: "タイムアウトしました。", code: 1)

@@ -59,12 +59,15 @@ final class MarkdownView: NSView {
 
     // MARK: - 表示
 
-    func render(text: String, directory: URL) {
+    /// - Parameter preservingScroll: 同じファイルの再読み込みなら true。
+    ///   別のファイルに切り替えるときは false にして先頭から見せる。
+    func render(text: String, directory: URL, preservingScroll: Bool) {
         lastContent = (text, directory)
         schemeHandler.documentDirectory = directory
         run { [weak self] in
-            self?.webView.callAsyncJavaScript("MDV.render(text)",
-                                              arguments: ["text": text],
+            self?.webView.callAsyncJavaScript("MDV.render(text, keepScroll)",
+                                              arguments: ["text": text,
+                                                          "keepScroll": preservingScroll],
                                               in: nil, in: .page) { _ in }
         }
     }
@@ -208,7 +211,7 @@ extension MarkdownView: WKNavigationDelegate {
         isShellReady = false
         let saved = lastContent
         webView.load(URLRequest(url: MarkdownView.shellURL))
-        if let saved { render(text: saved.text, directory: saved.directory) }
+        if let saved { render(text: saved.text, directory: saved.directory, preservingScroll: false) }
     }
 
     func webView(_ webView: WKWebView,

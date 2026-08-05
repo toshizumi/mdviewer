@@ -38,6 +38,38 @@ final class DocumentCoordinator {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
+    /// ドロップされたファイルを開く。
+    /// 1 つ目は落とされたウインドウの表示を差し替え、2 つ目以降は新しいウインドウで開く。
+    /// ただし、すでに別のウインドウで開いているファイルはそちらを前に出すだけにして、
+    /// 同じファイルが 2 枚並ばないようにする。
+    func open(_ urls: [URL], startingIn controller: DocumentWindowController) {
+        var reuseTarget: DocumentWindowController? = controller
+
+        for url in urls {
+            let target = url.standardizedFileURL
+
+            guard FileManager.default.fileExists(atPath: target.path) else {
+                presentMissingFileAlert(for: target)
+                continue
+            }
+
+            if let existing = controllers.first(where: { $0.fileURL == target }) {
+                existing.window?.makeKeyAndOrderFront(nil)
+                // 落とされたウインドウ自身が既にそのファイルなら、再読み込みだけしておく
+                if existing === controller { existing.show(fileURL: target) }
+                continue
+            }
+
+            if let reuse = reuseTarget {
+                reuse.show(fileURL: target)
+                reuse.window?.makeKeyAndOrderFront(nil)
+                reuseTarget = nil
+            } else {
+                open(target)
+            }
+        }
+    }
+
     func forget(_ controller: DocumentWindowController) {
         controllers.removeAll { $0 === controller }
     }
@@ -84,5 +116,13 @@ final class DocumentCoordinator {
 
     static func isMarkdown(_ url: URL) -> Bool {
         markdownExtensions.contains(url.pathExtension.lowercased())
+    }
+
+    /// MDViewer で表示できそうなファイルか。ドロップを受け付けるかの判定に使う。
+    /// 拡張子のないファイル（README など）も通す。
+    static func canOpen(_ url: URL) -> Bool {
+        let ext = url.pathExtension
+        if ext.isEmpty || isMarkdown(url) { return true }
+        return UTType(filenameExtension: ext)?.conforms(to: .text) ?? false
     }
 }
