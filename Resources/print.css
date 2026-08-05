@@ -1,0 +1,96 @@
+/* MDViewer — A4 印刷 / PDF 出力用スタイル。
+   shell.html から media="print" で読み込むので、ここに書いた内容は印刷時のみ効く。 */
+
+@page {
+  size: A4;
+  /* 下は PDFKit で入れるページ番号のぶん少し広めに取る */
+  margin: 18mm 15mm 20mm;
+}
+
+/* 画面がダークモードでも PDF は常にライトで出す。
+   style.css の :root[data-appearance="dark"] と同じ詳細度にして、後勝ちで打ち消す。 */
+:root,
+:root[data-appearance="dark"] {
+  --bg:            #ffffff;
+  --fg:            #16181c;
+  --fg-muted:      #4b545e;
+  --fg-faint:      #7d868f;
+  --border:        #b9c1c9;
+  --border-subtle: #dde3e8;
+  --code-bg:       #f5f7f9;
+  --code-fg:       #16181c;
+  --inline-code-bg:#eef1f4;
+  --accent:        #0a4fa0;
+  --quote-bar:     #c2cad2;
+  --table-stripe:  #f7f9fb;
+  --table-head:    #eef2f6;
+  --hr:            #d8dee4;
+}
+
+/* コード背景・表の罫線・シンタックスハイライトを印刷にも残す */
+* {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+html {
+  /* 画面の文字サイズ設定（インラインスタイル）を打ち消して常に 10.5pt にする */
+  font-size: 10.5pt !important;
+  background: #fff;
+}
+
+body {
+  background: #fff;
+  line-height: 1.75;
+}
+
+.markdown-body {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- 改ページ制御 ---------- */
+h1, h2, h3, h4, h5, h6 {
+  break-after: avoid-page;
+  break-inside: avoid;
+  margin-top: 1.6em;
+}
+/* 見出しの直後で切れないよう、続く要素も巻き込んで抑制する */
+h1 + *, h2 + *, h3 + *, h4 + * { break-before: avoid-page; }
+
+pre, blockquote, table, figure, img, .frontmatter { break-inside: avoid; }
+li, tr { break-inside: avoid; }
+p { orphans: 2; widows: 2; }
+
+/* 表が複数ページにまたがったらヘッダ行を繰り返す */
+thead { display: table-header-group; }
+
+/* ---------- 紙面に収める ---------- */
+/* 画面では横スクロールさせているものを、紙では折り返して全部見せる */
+pre { overflow: visible; }
+pre > code {
+  overflow-x: visible;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 8.6pt;
+  line-height: 1.55;
+}
+
+/* border-collapse の外枠は罫線の半分がボックスの外側に出る。
+   紙の右端ぴったりだとその半分が切れるので、1pt だけ内側に寄せる。 */
+.table-scroll { overflow: visible; margin-right: 1pt; }
+table { font-size: 9pt; min-width: 0; width: 100%; table-layout: auto; }
+/* 列数が多い表でも紙幅に収まるよう、セルの最小幅を単語より小さくできるようにする */
+th, td { padding: 0.35em 0.6em; overflow-wrap: anywhere; word-break: break-word; }
+thead th { white-space: normal; }
+
+img { max-width: 100%; max-height: 220mm; }
+
+/* ---------- 印刷では不要なもの ---------- */
+.anchor { display: none; }
+.empty-state { display: none; }
+img.broken { border-style: dotted; }
+
+/* リンクは色を残すが下線は付けない（URL 展開もしない） */
+a { color: var(--accent); text-decoration: none; }

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>MDViewer</string>
+	<key>CFBundleDisplayName</key>
+	<string>MDViewer</string>
+	<key>CFBundleIdentifier</key>
+	<string>jp.garage-standard.mdviewer</string>
+	<key>CFBundleExecutable</key>
+	<string>MDViewer</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.productivity</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>MDViewer</string>
+
+	<!-- 閲覧専用なので、AppKit が「編集」メニューに自動で足す入力系の項目は消す -->
+	<key>NSDisabledDictationMenuItem</key>
+	<true/>
+	<key>NSDisabledCharacterPaletteMenuItem</key>
+	<true/>
+
+	<!-- .md を「このアプリケーションで開く」に載せる。
+	     LSHandlerRank = Alternate なので既定アプリを勝手に奪わない。 -->
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Markdown Document</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Alternate</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>net.daringfireball.markdown</string>
+				<string>jp.garage-standard.mdviewer.markdown-variant</string>
+			</array>
+		</dict>
+	</array>
+
+	<!-- .md / .markdown は macOS が net.daringfireball.markdown として認識するが、
+	     .mdx や .qmd などにはシステム定義の型がない。
+	     既存の型に拡張子を「追加」することはできないので、変種用の型を別に宣言する。 -->
+	<key>UTExportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>jp.garage-standard.mdviewer.markdown-variant</string>
+			<key>UTTypeDescription</key>
+			<string>Markdown Document</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.plain-text</string>
+			</array>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>mdown</string>
+					<string>mkd</string>
+					<string>mkdn</string>
+					<string>mdwn</string>
+					<string>mdtext</string>
+					<string>mdx</string>
+					<string>qmd</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>text/markdown</string>
+					<string>text/x-markdown</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

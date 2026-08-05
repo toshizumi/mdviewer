@@ -1,0 +1,303 @@
+/* MDViewer — 画面表示用スタイル
+   配色は CSS 変数に集約し、data-appearance で自動 / ライト / ダークを切り替える。 */
+
+/* ---------- 配色 ---------- */
+:root {
+  --bg:            #ffffff;
+  --fg:            #1f2328;
+  --fg-muted:      #59636e;
+  --fg-faint:      #8b949e;
+  --border:        #d8dee4;
+  --border-subtle: #eaeef2;
+  --code-bg:       #f4f6f8;
+  --code-fg:       #1f2328;
+  --inline-code-bg:#eef1f4;
+  --accent:        #0757ba;
+  --quote-bar:     #d0d7de;
+  --table-stripe:  #f8fafc;
+  --table-head:    #f2f5f8;
+  --mark-bg:       #fff3c4;
+  --hr:            #e4e8ec;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-appearance="light"]) {
+    --bg:            #16181d;
+    --fg:            #e2e6eb;
+    --fg-muted:      #9aa4b0;
+    --fg-faint:      #6f7883;
+    --border:        #30363d;
+    --border-subtle: #23272e;
+    --code-bg:       #1c1f26;
+    --code-fg:       #e2e6eb;
+    --inline-code-bg:#262b33;
+    --accent:        #6cb6ff;
+    --quote-bar:     #3a424c;
+    --table-stripe:  #1a1d23;
+    --table-head:    #1e2229;
+    --mark-bg:       #6b5a17;
+    --hr:            #2b3038;
+  }
+}
+
+/* メニューから明示的にダークを選んだ場合。上のメディアクエリより後に置く。 */
+:root[data-appearance="dark"] {
+  --bg:            #16181d;
+  --fg:            #e2e6eb;
+  --fg-muted:      #9aa4b0;
+  --fg-faint:      #6f7883;
+  --border:        #30363d;
+  --border-subtle: #23272e;
+  --code-bg:       #1c1f26;
+  --code-fg:       #e2e6eb;
+  --inline-code-bg:#262b33;
+  --accent:        #6cb6ff;
+  --quote-bar:     #3a424c;
+  --table-stripe:  #1a1d23;
+  --table-head:    #1e2229;
+  --mark-bg:       #6b5a17;
+  --hr:            #2b3038;
+}
+
+/* ---------- 土台 ---------- */
+html {
+  /* Swift 側から font-size を書き換えて文字サイズを変える。以下はすべて em 基準。 */
+  font-size: 16px;
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+               "Yu Gothic", Meiryo, sans-serif;
+  font-size: 1rem;
+  line-height: 1.85;
+  letter-spacing: 0.01em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  overflow-wrap: break-word;
+  word-break: normal;
+  line-break: strict;
+}
+
+.markdown-body {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 2.6rem 2rem 8rem;
+}
+
+::selection { background: rgba(56, 132, 255, 0.28); }
+
+/* ---------- 見出し ---------- */
+h1, h2, h3, h4, h5, h6 {
+  margin: 2.2em 0 0.7em;
+  font-weight: 650;
+  line-height: 1.45;
+  letter-spacing: 0.005em;
+  scroll-margin-top: 1rem;
+}
+.markdown-body > :first-child { margin-top: 0; }
+
+h1 { font-size: 1.9em;  font-weight: 700; padding-bottom: 0.35em; border-bottom: 1px solid var(--border-subtle); }
+h2 { font-size: 1.45em; padding-bottom: 0.3em;  border-bottom: 1px solid var(--border-subtle); }
+h3 { font-size: 1.2em; }
+h4 { font-size: 1.05em; }
+h5 { font-size: 1em; color: var(--fg-muted); }
+h6 { font-size: 0.9em; color: var(--fg-muted); }
+
+/* 見出しにマウスを乗せると出るアンカーリンク */
+.anchor {
+  float: left;
+  margin-left: -1.05em;
+  padding-right: 0.25em;
+  color: var(--fg-faint);
+  opacity: 0;
+  text-decoration: none;
+  font-weight: 400;
+  transition: opacity 0.12s ease;
+}
+h1:hover .anchor, h2:hover .anchor, h3:hover .anchor,
+h4:hover .anchor, h5:hover .anchor, h6:hover .anchor { opacity: 1; }
+
+/* ---------- 本文 ---------- */
+p { margin: 0 0 1.15em; }
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+strong { font-weight: 680; }
+em { font-style: italic; }
+del { color: var(--fg-muted); }
+mark { background: var(--mark-bg); color: inherit; padding: 0 0.15em; border-radius: 2px; }
+
+/* ⌘F の検索ヒット。現在位置だけ色を変える。 */
+mark.find-hit {
+  background: #ffe066;
+  color: #16181c;
+  padding: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+mark.find-hit.current {
+  background: #ff9f43;
+  box-shadow: 0 0 0 2px rgba(255, 159, 67, 0.45);
+}
+
+hr {
+  height: 1px;
+  border: 0;
+  background: var(--hr);
+  margin: 2.4em 0;
+}
+
+/* ---------- リスト ---------- */
+ul, ol { margin: 0 0 1.15em; padding-left: 1.6em; }
+li { margin: 0.25em 0; }
+li > ul, li > ol { margin: 0.25em 0; }
+li > p { margin-bottom: 0.5em; }
+
+/* タスクリスト */
+li.task-item { list-style: none; margin-left: -1.35em; padding-left: 1.35em; position: relative; }
+li.task-item .task-box {
+  position: absolute;
+  left: 0;
+  top: 0.42em;
+  width: 0.92em;
+  height: 0.92em;
+  border: 1.5px solid var(--border);
+  border-radius: 3px;
+  box-sizing: border-box;
+}
+li.task-item.done .task-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+li.task-item.done .task-box::after {
+  content: "";
+  position: absolute;
+  left: 0.28em;
+  top: 0.08em;
+  width: 0.22em;
+  height: 0.46em;
+  border: solid #fff;
+  border-width: 0 1.8px 1.8px 0;
+  transform: rotate(42deg);
+}
+li.task-item.done { color: var(--fg-muted); }
+
+/* ---------- 引用 ---------- */
+blockquote {
+  margin: 0 0 1.15em;
+  padding: 0.1em 0 0.1em 1.1em;
+  border-left: 3px solid var(--quote-bar);
+  color: var(--fg-muted);
+}
+blockquote > :last-child { margin-bottom: 0; }
+
+/* ---------- コード ---------- */
+code, kbd, samp, pre {
+  font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas,
+               "Hiragino Sans", monospace;
+  font-variant-ligatures: none;
+}
+
+:not(pre) > code {
+  background: var(--inline-code-bg);
+  padding: 0.15em 0.38em;
+  border-radius: 4px;
+  font-size: 0.875em;
+}
+
+pre {
+  margin: 0 0 1.3em;
+  padding: 0;
+  background: var(--code-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  overflow: hidden;
+}
+pre > code {
+  display: block;
+  padding: 0.95em 1.1em;
+  overflow-x: auto;
+  background: transparent !important;
+  color: var(--code-fg);
+  font-size: 0.845em;
+  line-height: 1.65;
+  tab-size: 4;
+}
+
+/* ---------- 表 ---------- */
+.table-scroll { overflow-x: auto; margin: 0 0 1.3em; }
+table {
+  border-collapse: collapse;
+  font-size: 0.93em;
+  line-height: 1.65;
+  min-width: 100%;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.5em 0.85em;
+  text-align: left;
+  vertical-align: top;
+}
+thead th { background: var(--table-head); font-weight: 650; white-space: nowrap; }
+tbody tr:nth-child(even) { background: var(--table-stripe); }
+
+/* ---------- 画像 ---------- */
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+/* 段落内で画像だけの場合は中央寄せにする */
+p > img:only-child { display: block; margin: 0.4em auto; }
+/* 読み込めなかった画像は枠だけ出して壊れアイコンの散らかりを防ぐ */
+img.broken {
+  display: inline-block;
+  min-width: 8em;
+  padding: 0.6em 0.9em;
+  border: 1px dashed var(--border);
+  color: var(--fg-faint);
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+/* ---------- フロントマター ---------- */
+.frontmatter {
+  margin: 0 0 2em;
+  padding: 0.75em 1em;
+  background: var(--code-bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8em;
+  line-height: 1.7;
+  color: var(--fg-muted);
+  white-space: pre-wrap;
+}
+
+/* ---------- 脚注 ---------- */
+.footnotes {
+  margin-top: 3em;
+  padding-top: 1.2em;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.9em;
+  color: var(--fg-muted);
+}
+.footnotes hr { display: none; }
+.footnote-backref { text-decoration: none; }
+
+/* ---------- 空状態 ---------- */
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 70vh;
+  color: var(--fg-faint);
+  font-size: 0.95em;
+}

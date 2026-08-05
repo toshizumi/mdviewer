@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ja" data-appearance="auto">
+<head>
+<meta charset="utf-8">
+<!-- スクリプトはバンドル同梱のものだけ実行可能にする。
+     Markdown 内に生 HTML で <script> や onclick= が書かれていても発火しない。 -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'none';
+  script-src mdv://app;
+  style-src mdv://app 'unsafe-inline';
+  img-src mdv: data: https:;
+  font-src mdv://app;
+  media-src mdv:;
+  connect-src 'none';
+  form-action 'none';
+  base-uri 'none';">
+<title>MDViewer</title>
+<!-- ライトテーマは常時有効。ダークテーマは media="screen" なので、
+     画面がダークでも PDF には効かない（＝紙は常にライトで出る）。 -->
+<link rel="stylesheet" href="mdv://app/vendor/hljs-light.css" id="hl-light">
+<link rel="stylesheet" href="mdv://app/vendor/hljs-dark.css" id="hl-dark" media="screen" disabled>
+<link rel="stylesheet" href="mdv://app/style.css">
+<link rel="stylesheet" href="mdv://app/print.css" media="print">
+<script src="mdv://app/vendor/markdown-it.min.js"></script>
+<script src="mdv://app/vendor/markdown-it-footnote.min.js"></script>
+<script src="mdv://app/vendor/highlight.min.js"></script>
+</head>
+<body>
+<main id="content" class="markdown-body"></main>
+<script src="mdv://app/app.js"></script>
+</body>
+</html>

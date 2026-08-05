@@ -1,0 +1,78 @@
+# MDViewer 実装タスク
+
+## 目標
+macOS向けの超軽量Markdownビューア。編集機能なし。A4 PDF出力あり。Finderの右クリックから開ける。
+
+## チェックリスト
+
+### 1. 土台
+- [x] `fetch-vendor.sh` — markdown-it / markdown-it-footnote / highlight.js を取得
+- [x] `Info.plist` — CFBundleDocumentTypes で .md を関連付け
+- [x] `build.sh` — swiftc → .app 組み立て → ad-hoc署名
+- [x] `install.sh` — /Applications へ配置 + lsregister
+- [x] `make-icon.sh` — AppIcon.icns 生成
+
+### 2. Web層（Resources/）
+- [x] `shell.html` — 空のシェル + CSP
+- [x] `style.css` — 画面用（light/dark、日本語フォント）
+- [x] `print.css` — A4印刷用（改ページ制御）
+- [x] `app.js` — markdown-it 呼び出し・タスクリスト・フロントマター・検索・印刷モード
+
+### 3. Swift層（Sources/）
+- [x] `main.swift` / `Preferences.swift` / `SchemeHandler.swift` / `FileWatcher.swift`
+- [x] `MarkdownView.swift` / `PDFExporter.swift` / `DocumentWindow.swift` / `AppDelegate.swift`
+- [x] `TextFile.swift` — 文字コード判定
+- [x] `DocumentCoordinator.swift` — 1ファイル1ウインドウ
+- [x] `HeadlessExporter.swift` — `--pdf` / `--snapshot`
+
+### 4. 検証
+- [x] `sample/test.md` を用意（GFM全部入り・日本語・コード・表・画像・脚注）
+- [x] ビルドが警告なく通る（900 KB）
+- [x] 表示のレイアウト目視確認（ライト / ダーク）
+- [x] 起動速度 — プロセス開始から初回描画まで 354 / 442 / 457 ms
+- [x] PDF出力（A4・ページ番号・改ページ・コード折り返し・表の収まり）
+- [x] 自動リロード（インプレース書き込み / アトミック保存 / 連続保存）
+- [x] Finder右クリックから開ける（.md .markdown .mdx .qmd .mkd .mdown すべてOK）
+- [x] 異常系（92MBファイル / バイナリ / Shift_JIS / 存在しないパス）
+- [x] GUIからのPDF書き出し・⌘Pの印刷ダイアログ
+- [x] ⌘Fの逐次検索・次を検索・Escapeでの解除
+- [x] 複数ウインドウ / 同一ファイルの再オープン / 最近使った項目
+- [x] 文字サイズ・外観の永続化とメニューのチェック表示
+- [ ] ドラッグ&ドロップ（自動テスト不可。実機で手動確認が必要）
+
+---
+
+## レビュー
+
+### やったこと
+`swiftc` + シェルスクリプトで `.app` を組み立てる、Xcodeプロジェクトを持たない構成にした。
+純AppKit + WKWebView。Markdownのレンダリングは同梱の markdown-it に任せ、その結果を
+そのまま印刷組版に流している。約900KB、初回描画まで350〜450ms。
+
+### 設計判断
+- **WKWebViewに寄せた**: 自前レンダラよりGFM互換性・日本語の折り返し・表組みで勝り、
+  PDF化がそのまま乗る。起動コストはWebKitのプロセス起動が支配的で、同梱JS（246KB）を
+  外しても起動時間は変わらなかった（実測）ので、機能を削る意味はなかった。
+- **`mdv://` カスタムスキーム1本**: `file://` のサブリソース制限を根本回避。
+  App Sandbox無効・ローカル配布前提なので、これで画像もCSSも安全に配れる。
+- **PDFは `NSPrintOperation`**: `createPDF` はページ分割されない長尺PDFしか作れない。
+  ページ番号はPDFKit+CoreGraphicsで焼き込み（注釈ではないのでどのビューアでも同じ）。
+
+### 詰まった点（次に同じことをやるなら）
+1. **WebKitの印刷は、対象ビューが画面に出ているウインドウに載っていないとページ数を確定できない。**
+   `knowsPageRange` が `{1, Int.max}` を返し続け、PDFが数百MBまで肥大する。
+   ヘッドレス出力では画面外にウインドウを1枚置いて回避した。
+2. **`NSPrintOperation` の `didRun` は別スレッドから呼ばれる。** そこからWKWebViewに触って
+   `EXC_BREAKPOINT` でクラッシュした。完了通知は必ずメインスレッドに戻す。
+3. **`NSSearchToolbarItem` は挿入時に検索フィールドを組み直し、delegateを奪う。**
+   素の `NSSearchField` に置き換え、`NSControl.textDidChangeNotification` を直接購読した。
+4. **`validateMenuItem` は `NSMenuItemValidation` に準拠しないと呼ばれない。**
+   準拠宣言を書き忘れてメニューのチェックマークが出なかった。
+5. **既存UTIに拡張子を追加することはできない。** `UTImportedTypeDeclarations` で
+   `net.daringfireball.markdown` に `.mdx` を足そうとしても無視される。自前の型を
+   `UTExportedTypeDeclarations` で宣言する必要がある。
+6. **`border-collapse` の外枠は罫線の半分がボックス外に出る。** 紙の右端ぴったりだと切れる。
+
+### 残っていること
+- ドラッグ&ドロップだけは自動テストできていない（実機で確認してほしい）
+- Mermaid図・数式（KaTeX）は「標準セット」の選択に従って入れていない。必要なら追加可能

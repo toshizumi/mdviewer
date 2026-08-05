@@ -1,0 +1,5 @@
+# ビルド成果物
+build/
+
+# macOS
+.DS_Store
