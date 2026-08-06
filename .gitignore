@@ -3,3 +3,7 @@ build/
 
 # macOS
 .DS_Store
+
+# 作業メモ・Claude Code 向けの手引き（公開しない）
+CLAUDE.md
+tasks/
